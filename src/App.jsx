@@ -1,115 +1,105 @@
 import React, { useState, useEffect } from 'react';
 
-const ALL_COUNTRIES = [
-  { id: 'USA', name: 'USA', flag: '🇺🇸', power: 95 },
-  { id: 'CHN', name: 'China', flag: '🇨🇳', power: 94 },
-  { id: 'JAM', name: 'Jamaica', flag: '🇯🇲', power: 92 },
-  { id: 'GBR', name: 'UK', flag: '🇬🇧', power: 88 },
-  { id: 'CAN', name: 'Canada', flag: '🇨🇦', power: 87 },
-  { id: 'AUS', name: 'Australia', flag: '🇦🇺', power: 89 },
-  { id: 'FRA', name: 'France', flag: '🇫🇷', power: 86 },
-  { id: 'GER', name: 'Germany', flag: '🇩🇪', power: 85 },
-  { id: 'KEN', name: 'Kenya', flag: '🇰🇪', power: 90 },
-  { id: 'BRA', name: 'Brazil', flag: '🇧🇷', power: 82 },
-];
-
 export default function OlympicSim() {
+  const [allCountries, setAllCountries] = useState([]);
   const [selected, setSelected] = useState([]);
   const [results, setResults] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
-  
-  // Persistent Medal State
-  const [medals, setMedals] = useState(() => {
-    const saved = localStorage.getItem('olympicMedals');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [showPodium, setShowPodium] = useState(false);
 
+  // 1. Fetch all 193+ Countries on mount
   useEffect(() => {
-    localStorage.setItem('olympicMedals', JSON.stringify(medals));
-  }, [medals]);
+    fetch('https://restcountries.com/v3.1/all?fields=name,flags,cca3,continents')
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map(c => ({
+          id: c.cca3,
+          name: c.name.common,
+          flag: c.flags.png,
+          region: c.continents[0]
+        })).sort((a, b) => a.name.localeCompare(b.name));
+        setAllCountries(formatted);
+      });
+  }, []);
 
   const runSimulation = () => {
-    if (selected.length !== 8) return alert("Select 8 countries!");
     setIsSimulating(true);
-
+    setShowPodium(false);
+    
     setTimeout(() => {
-      const heatResults = selected.map(c => ({
+      const heat = selected.map(c => ({
         ...c,
-        time: (12 - (c.power / 20) + Math.random() * 0.5).toFixed(2)
+        athlete: `AI Athlete ${Math.floor(Math.random() * 99)}`,
+        time: (9.5 + Math.random() * 2).toFixed(2)
       })).sort((a, b) => a.time - b.time);
 
-      setResults(heatResults);
+      setResults(heat);
       setIsSimulating(false);
-      updateMedals(heatResults);
-    }, 1500);
-  };
-
-  const updateMedals = (standings) => {
-    setMedals(prev => {
-      const newMedals = { ...prev };
-      ['gold', 'silver', 'bronze'].forEach((type, i) => {
-        const countryId = standings[i].id;
-        if (!newMedals[countryId]) newMedals[countryId] = { gold: 0, silver: 0, bronze: 0 };
-        newMedals[countryId][type] += 1;
-      });
-      return newMedals;
-    });
+      setShowPodium(true);
+      
+      // 2. Play National Anthem (Announcement)
+      const announcement = new SpeechSynthesisUtterance(
+        `Gold medal goes to ${heat[0].name}. Playing the national anthem.`
+      );
+      window.speechSynthesis.speak(announcement);
+    }, 3000);
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto bg-slate-50 min-h-screen">
-      <div className="flex flex-col md:flex-row gap-8">
+    <div className="min-h-screen bg-slate-900 text-white p-8">
+      {/* Search & Select */}
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-black mb-8 text-center text-yellow-500">AI GLOBAL GAMES</h1>
         
-        {/* Left Side: Race Controls */}
-        <div className="flex-1">
-          <h1 className="text-2xl font-black mb-6">ATHLETE SELECTION (Select 8)</h1>
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {ALL_COUNTRIES.map(c => (
-              <button 
-                key={c.id}
-                onClick={() => selected.length < 8 && setSelected([...selected, c])}
-                disabled={selected.includes(c)}
-                className="p-2 bg-white border rounded shadow-sm hover:bg-blue-50 disabled:opacity-30"
-              >
-                {c.flag} {c.name}
-              </button>
-            ))}
-          </div>
-          <button onClick={runSimulation} className="w-full py-4 bg-blue-600 text-white font-bold rounded-lg">
-            {isSimulating ? "RACING..." : "RUN EVENT"}
-          </button>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8 max-h-48 overflow-y-auto p-4 bg-slate-800 rounded">
+          {allCountries.map(c => (
+            <button 
+              key={c.id} 
+              onClick={() => selected.length < 8 && setSelected([...selected, c])}
+              className={`p-2 text-xs flex items-center gap-2 border rounded ${selected.includes(c) ? 'bg-blue-600' : 'bg-slate-700'}`}
+            >
+              <img src={c.flag} className="w-6 h-4 object-cover" alt="flag" /> {c.name}
+            </button>
+          ))}
         </div>
 
-        {/* Right Side: Medal Table */}
-        <div className="w-full md:w-80 bg-white p-4 rounded-xl shadow-lg border border-slate-200">
-          <h2 className="font-bold text-center mb-4 border-b pb-2 text-slate-600">ALL-TIME MEDAL COUNT</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-slate-400">
-                <th className="text-left">Nation</th>
-                <th>🥇</th><th>🥈</th><th>🥉</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(medals)
-                .sort(([, a], [, b]) => b.gold - a.gold)
-                .map(([id, counts]) => (
-                  <tr key={id} className="border-t">
-                    <td className="py-2 font-bold">{ALL_COUNTRIES.find(c => c.id === id)?.flag} {id}</td>
-                    <td className="text-center">{counts.gold}</td>
-                    <td className="text-center">{counts.silver}</td>
-                    <td className="text-center">{counts.bronze}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          <button 
-            onClick={() => { localStorage.clear(); setMedals({}); }}
-            className="mt-4 text-xs text-red-400 hover:underline w-full"
-          >
-            Clear Records
-          </button>
-        </div>
+        <button 
+          disabled={selected.length !== 8} 
+          onClick={runSimulation}
+          className="w-full py-4 bg-yellow-500 text-black font-bold rounded-full mb-12 disabled:opacity-50"
+        >
+          {isSimulating ? "RACING..." : "START EVENT"}
+        </button>
+
+        {/* 3. Victory Podium Visual */}
+        {showPodium && results.length > 0 && (
+          <div className="flex flex-col items-center animate-bounce-in">
+            <h2 className="text-2xl font-bold mb-10">VICTORY CEREMONY</h2>
+            <div className="flex items-end gap-2 h-64">
+              {/* Silver */}
+              <div className="flex flex-col items-center">
+                <img src={results[1].flag} className="w-12 border-2 border-white mb-2" />
+                <div className="w-24 h-32 bg-slate-400 flex items-center justify-center font-bold text-2xl">2</div>
+                <p className="text-xs mt-2">{results[1].id}</p>
+              </div>
+              {/* Gold */}
+              <div className="flex flex-col items-center">
+                <img src={results[0].flag} className="w-16 border-4 border-yellow-500 mb-2 animate-pulse" />
+                <div className="w-28 h-48 bg-yellow-500 flex flex-col items-center justify-center font-bold text-4xl text-slate-900">
+                  <span>1</span>
+                  <span className="text-xs uppercase mt-2">Champion</span>
+                </div>
+                <p className="font-bold mt-2 text-yellow-500 italic">Anthem Playing...</p>
+              </div>
+              {/* Bronze */}
+              <div className="flex flex-col items-center">
+                <img src={results[2].flag} className="w-12 border-2 border-white mb-2" />
+                <div className="w-24 h-24 bg-orange-700 flex items-center justify-center font-bold text-2xl">3</div>
+                <p className="text-xs mt-2">{results[2].id}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
